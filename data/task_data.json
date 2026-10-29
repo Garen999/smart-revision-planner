@@ -32,7 +32,7 @@
         "Difficulty": "5",
         "Deadline": "13-10-2026",
         "Duration": "90",
-        "Completed": true,
+        "Completed": false,
         "Priority": 0
     }
 ]
