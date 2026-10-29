@@ -1,4 +1,5 @@
 #imports
+import json
 import tkinter as tk
 from tkinter import messagebox, ttk
 from datetime import datetime
@@ -10,6 +11,10 @@ root.geometry("1000x700")
 root.configure(bg="#171A21")
 root.rowconfigure(1, weight=1)
 root.columnconfigure((0,1), weight=1, uniform="equal_columns")
+
+#images
+bin_icon = tk.PhotoImage(file="images/bin_icon.png")
+bin_icon = bin_icon.subsample(24,24)
 
 #main heading
 heading = tk.Label(
@@ -25,16 +30,16 @@ heading = tk.Label(
 heading.grid(row=0, column=0, columnspan=2, pady=5)
 
 #creates frames
-def create_frame(x, y, left_pad, right_pad):
+def create_frame(x, y, sides, left_pad, right_pad):
     frame = tk.Frame(root, bg="#252A36")
-    frame.grid(row=x, column=y, sticky="nsew", padx=(left_pad,right_pad))
+    frame.grid(row=x, column=y, sticky=sides, padx=(left_pad,right_pad))
     return frame
 
 #frames
-task_input_frame = create_frame(1,0,20,10)
+task_input_frame = create_frame(1,0,"new",20,10)
 task_input_frame.columnconfigure(0, weight=1)
 
-task_output_frame = create_frame(1,1,10,20)
+task_output_frame = create_frame(1,1,"nesw",10,20)
 task_output_frame.rowconfigure(1, weight=1)
 task_output_frame.columnconfigure(0, weight=1)
 
@@ -99,7 +104,7 @@ reg_validates_duration = root.register(validates_duration)
 subject_label, subject_entry = creates_entry_labels("Subject",task_input_frame,2)
 topic_label, topic_entry = creates_entry_labels("Topic",task_input_frame,4)
 difficulty_label, difficulty_entry = creates_entry_labels("Difficulty (1-5)",task_input_frame,6)
-deadline_label, deadline_entry = creates_entry_labels("Deadline (YYYY-MM-DD)",task_input_frame,8)
+deadline_label, deadline_entry = creates_entry_labels("Deadline (DD-MM-YYYY)",task_input_frame,8)
 duration_label, duration_entry = creates_entry_labels("Duration (Minutes)",task_input_frame,10)
 
 difficulty_entry.config(validate="key", validatecommand=(reg_validates_difficulty, "%P"))
@@ -111,7 +116,6 @@ def clear_entries():
         entry.delete(0, tk.END)
 
 tasks = []
-task_row_index = 1
 
 #add task button actions
 def add_task():
@@ -123,7 +127,9 @@ def add_task():
         "Difficulty": difficulty_entry.get(),
         "Deadline": deadline_entry.get(),
         "Duration": duration_entry.get(),
-        "Completed": False
+        "Completed": False,
+        "Priority": 0,
+        "Widget": None
     }
     
     valid_entries = []
@@ -137,10 +143,10 @@ def add_task():
     #checks if deadline is in correct format
     if task_information["Deadline"] != "":
         try:
-            datetime.strptime(task_information["Deadline"], "%Y-%m-%d")
+            datetime.strptime(task_information["Deadline"], "%d-%m-%Y")
         except ValueError:
             valid_entries[3] = False
-            messagebox.showerror("showerror","Deadline Must be in YYYY-MM-DD format")
+            messagebox.showerror("showerror","Deadline Must be in DD-MM-YYYY format")
 
     #checks if all entries are filled
     if all(valid_entries):
@@ -149,8 +155,9 @@ def add_task():
         clear_entries()
 
         #updates task list
-        create_task_card(task_information)
-        task_row_index += 1
+        task_information["Widget"] = create_task_card(task_information)
+        ranks_tasks()
+        saves_data()
 
     else:
         messagebox.showerror("showerror","You Must Fill in All Entries to Add a Task")
@@ -162,8 +169,19 @@ add_task_button.grid(row=12, column=0, sticky="ew", padx=18, pady=10)
 #creates task cards
 def create_task_card(task_information):
     task_card = tk.Frame(revision_tasks_frame, bg="#171A21")
-    task_card.grid(row=task_row_index, column=0, sticky="nesw", padx=20, pady=5)
-    task_card.columnconfigure(0, weight=1)
+    task_card.grid(row=tasks.index(task_information) + 1, column=0, sticky="nesw", padx=20, pady=5)
+    task_card.columnconfigure(1, weight=1)
+
+    #delete task button
+    def delete_task():
+        task_card.destroy()
+        tasks.remove(task_information)
+        ranks_tasks()
+        saves_data()
+
+    delete_button = tk.Label(task_card, image=bin_icon, bg="#171A21", cursor="hand2")
+    delete_button.grid(row=1, column=2, sticky="e", padx=10)
+    delete_button.bind("<Button-1>", lambda event:delete_task())
 
     #creates task card labels
     def create_task_card_label(label_text, background_colour, font_colour, font_size, font_type, x, y, side, top_pad, bottom_pad, line_length):
@@ -176,15 +194,52 @@ def create_task_card(task_information):
             wraplength=line_length
             )
         
-        label.grid(row=x, column=y, sticky=side, padx=20, pady=(top_pad,bottom_pad))
+        label.grid(row=x, column=y, sticky=side, padx=10, pady=(top_pad,bottom_pad))
+        return label
+    
+    deadline_text = datetime.strptime(task_information["Deadline"], "%d-%m-%Y")
+    days = abs((deadline_text - datetime.now()).days)
 
-    deadline_text = datetime.strptime(task_information["Deadline"], "%Y-%m-%d")
+    days_text = " (Overdue)" if deadline_text < datetime.now() else " (" + str(days)+ " days away)"
 
-    create_task_card_label(task_information["Subject"], "#171A21", "#ffffff", 15, "bold", 0, 0, "w", 10, 5, 150)
-    create_task_card_label(task_information["Topic"], "#171A21", "#D6DBE6", 12, "normal", 1, 0, "w", 0, 5, 200)
-    create_task_card_label(deadline_text.strftime("%d %b %Y"), "#171A21", "#A8B0C2", 10, "normal", 2, 0, "w", 5, 10, 0)
-    create_task_card_label("Difficulty " + str(task_information["Difficulty"]), "#303D59", "#93B4FF", 10, "bold", 0, 1, "e", 10, 5, 0)
-    create_task_card_label(str(task_information["Duration"]) + " min", "#171A21", "#A8B0C2", 10, "normal", 2, 1, "e", 5, 10, 0)
+    task_card_subject_label = create_task_card_label(task_information["Subject"], "#171A21", "#ffffff", 15, "bold", 0, 1, "w", 10, 5, 250)
+
+    create_task_card_label(task_information["Topic"], "#171A21", "#D6DBE6", 12, "normal", 1, 1, "w", 0, 5, 200)
+
+    create_task_card_label(
+        deadline_text.strftime("%d %b %Y") + days_text + " · " + str(task_information["Duration"]) + " min", 
+        "#171A21", 
+        "#A8B0C2", 
+        10, 
+        "normal", 
+        2, 1, "w", 5, 10, 0
+        )
+    
+    create_task_card_label("Difficulty " + str(task_information["Difficulty"]), "#303D59", "#93B4FF", 10, "bold", 0, 2, "e", 10, 5, 0)
+
+    #complete task button
+    def complete_task():
+        if complete_button_state.get():
+            task_information["Completed"] = True
+            task_card_subject_label.configure(fg="#00FF00")
+        else:
+            task_information["Completed"] = False
+            task_card_subject_label.configure(fg="#FFFFFF")
+        ranks_tasks()
+        saves_data()
+
+    complete_button_state = tk.BooleanVar(value=task_information["Completed"])
+
+    complete_button = tk.Checkbutton(
+        task_card, 
+        bg="#171A21", 
+        variable=complete_button_state, 
+        command=complete_task
+        )
+    
+    complete_button.grid(row=0, column=0, sticky="w", padx=10, pady=(10,5))
+
+    return task_card
 
 #scrollable tasks
 canvas = tk.Canvas(task_output_frame, bg="#252A36", highlightthickness=0)
@@ -200,6 +255,54 @@ revision_tasks_frame_id = canvas.create_window((0,0), window=revision_tasks_fram
 revision_tasks_frame.columnconfigure(0, weight=1)
 revision_tasks_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
 canvas.bind("<Configure>", lambda event: canvas.itemconfigure(revision_tasks_frame_id, width = event.width))
+
+# #determines task priority
+def ranks_tasks():
+    global tasks
+
+    for task in tasks:
+        days = (datetime.strptime(task["Deadline"], "%d-%m-%Y") - datetime.now()).days
+
+        if task["Completed"]: 
+            score = 0
+        elif days <=0:
+            score = 0
+        else:
+            score = int(task["Difficulty"])*int(task["Duration"])/days
+
+        task["Priority"] = score
+
+    tasks = sorted(tasks, key=lambda x: x["Priority"], reverse=True)
+
+    for i, task in enumerate(tasks):
+        task["Widget"].grid(row=i+ 1, column=0, sticky="nesw", padx=20, pady=5)
+
+#saves task data
+def saves_data():
+    saved_tasks = [
+        {key: value for key, value in task.items() if key!="Widget"}
+        for task in tasks
+    ]
+
+    with open("data/task_data.json","w") as task_data_file:
+        json.dump(saved_tasks, task_data_file, indent=4)
+
+#loads task data
+def loads_data():
+    global tasks
+
+    with open("data/task_data.json","r") as task_data_file:
+        try:
+            tasks = json.load(task_data_file)
+        except json.JSONDecodeError as e:
+            print("Invalid JSON syntax:", e)
+
+    for task in tasks:
+        task.update({"Widget": create_task_card(task)})
+
+    ranks_tasks()
+
+loads_data()
 
 #runs main loop
 root.mainloop()
