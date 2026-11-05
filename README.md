@@ -11,7 +11,7 @@ A desktop revision planning application developed independently using Python and
 - **Input validation:** Validate task difficulty, duration and deadline formats.
 - **Graphical interface:** Dark-themed Tkinter interface with scrollable task cards.
 
-![alt text](window.png)
+![alt text](images/window.png)
 
 ## Prioritisation Algorithm
 
